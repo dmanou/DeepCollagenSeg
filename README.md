@@ -4,6 +4,8 @@
 
 Pytorch implementation of the paper "XX"
 
+![Collagen segmentation](segmentation.png)
+
 ## 1) Clone the repository
 
 ```bash
