@@ -1,4 +1,4 @@
-# Segmentation_Collagene
+# DeepCollagenSeg
 
 ## Overview
 
