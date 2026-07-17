@@ -1,76 +1,129 @@
+##
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import v2
+from torch.utils.data import Dataset, DataLoader
+
+##
+import cv2
+from PIL import Image
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-import kornia.augmentation as K
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from torch.utils.data import DataLoader
-
-import dataloader as dataloader
-import torch.optim as optim
-
-from unet import UNet
-import utils
-
-device = (
-    "cuda"
-    if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
-)
-
-saving_path="/NAS/coolio/dorian/PROJETS/MENINGIOME_SEG/ANAPATH/model_v2/mean_teacher/training/weights/"
-results_path="/NAS/coolio/dorian/PROJETS/MENINGIOME_SEG/ANAPATH/model_v2/mean_teacher/results/"
-
 import os
+
+##
+from unet import UNet
+
+
+##########################################################
+# Arguments
+##########################################################
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--tile_list", type=list, help="Tiles to segment")
+parser.add_argument("--resize_tiles", action="store_true", help="tile resolution is initially 0.25mpp with 1024x1024 resized to 0.5 mpp 512x512")
+parser.add_argument("--sd", type=str, help="Output directory where model outputs will be saved")
+parser.add_argument("--use_gpu", action="store_true", help="Use GPU acceleration (default: cpu)")
+parser.add_argument("--batchsize", action=int, help="bacth size (default 8)")
+
+args = parser.parse_args()
+device = "cuda" if args.use_gpu and torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+
 os.makedirs(saving_path, exist_ok=True)
 os.makedirs(results_path, exist_ok=True)
 
-## --------
-## Loaders
-## --------
+##########################################################
+# Loaders
+##########################################################
 
-ds = dataloader.UnLabeledDataset(tab_unlabel)
-dataloader_ds = DataLoader(ds, batch_size = 16, shuffle = False, pin_memory=True, num_workers=8, persistent_workers=True)
+class TileDataset(Dataset):
+    def __init__(self, tile_list, target_size=512):
+        self.tile_list = tile_list
+        self.to_image = v2.ToImage()
+        self.target_size = (target_size, target_size)
 
-teacher_model = UNet(in_channels=3, out_channels=64, num_classes=1).to(device)
+    def __len__(self):
+        return len(self.tile_list)
 
-checkpoints = torch.load(saving_path + "epochs_49.pth", map_location='cpu')
-teacher_model.load_state_dict(checkpoints["model_state_dict"])
+    def resize(self, patch):
+        patch_512 = cv2.resize(
+            patch,
+            self.target_size,
+            interpolation=cv2.INTER_AREA
+        )
+
+        return patch_512
+
+    def __getitem__(self, idx):
+
+        path = self.tile_list[idx]
+        tile = Image.open(path)
+        tile = self.resize(np.array(tile))
+        tile = self.to_image(tile).float() / 255.0
+
+        return tile
+
+dataset = TileDataset(tile_list = args.tile_list)
+loader = DataLoader(dataset, 
+                    batch_size = args.batchsize, 
+                    shuffle = False, 
+                    pin_memory=True, 
+                    num_workers=8, 
+                    persistent_workers=True)
+
+##########################################################
+# Model
+##########################################################
+
+pretrained_weights = "weights/pretrained_weights.pth"
+
+teacher_model = UNet(
+    in_channels=3,
+    out_channels=64,
+    num_classes=1,
+).to(device)
+
+checkpoint = torch.load(
+    pretrained_weights,
+    map_location="cpu"
+)
+
+teacher_model.load_state_dict(
+    checkpoint["model_state_dict"]
+)
 
 teacher_model.eval()
 
-collagene_ratio = []
+def predict_logits(model, x):
+    """Forward pass of the UNet."""
+
+    x0 = model.enc_1(x)
+    x1 = model.enc_2(x0)
+    x2 = model.enc_3(x1)
+    x3 = model.enc_4(x2)
+    x4 = model.enc_5(x3)
+
+    u3 = model.dec_4(x4, x3)
+    u2 = model.dec_3(u3, x2)
+    u1 = model.dec_2(u2, x1)
+    u0 = model.dec_1(u1, x0)
+
+    return model.logits(u0)
+
+##########################################################
+# Inference
+##########################################################
 
 with torch.no_grad():
-    for idx_batch, img in enumerate(tqdm(dataloader_ds)):
-        # img, mask = batch[0], batch[1]
+    for tile in tqdm(loader):
         img = img.to(device)
-        # mask = mask.to(device)
+
         with torch.autocast("cuda"):
-            x0 = teacher_model.enc_1(img)
-            x1 = teacher_model.enc_2(x0)
-            x2 = teacher_model.enc_3(x1)
-            x3 = teacher_model.enc_4(x2)
-            x4 = teacher_model.enc_5(x3)
-            # decode
-            u3 = teacher_model.dec_4(x4, x3)
-            u2 = teacher_model.dec_3(u3, x2)
-            u1 = teacher_model.dec_2(u2, x1)
-            u0 = teacher_model.dec_1(u1, x0)
+            logits = predict_logits(teacher_model, img)
+            
+        mask = (torch.sigmoid(logits) > 0.5).float().detach().numpy().cpu()
 
-            logits = teacher_model.logits(u0)
-            # logits, aux1, aux2 = teacher_model(img)
-            mask = (torch.sigmoid(logits) > 0.5).float()
-            mask_area =  mask.sum(dim=(1, 2, 3))
-
-        collagene_ratio.append(mask_area.detach().cpu())
-
-collagene_full = torch.cat(collagene_ratio, dim = 0).float().numpy()
-
-tab_unlabel['collagene'] = collagene_full
-
-tab_unlabel.to_csv(f"{saving_path}tab_with_collagene.csv", index = False)
+    mask.save(....)
