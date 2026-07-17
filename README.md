@@ -9,8 +9,8 @@ Pytorch implementation of the paper "XX"
 ## 1) Clone the repository
 
 ```bash
-git clone https://github.com/dmanou/Segmentation_Collagene.git
-cd Segmentation_Collagene
+git clone https://github.com/dmanou/DeepCollagenSeg.git
+cd DeepCollagenSeg
 ```
 ### 2) Create Conda environment (Python 3.9.16)
 
@@ -37,7 +37,7 @@ To run the inference script, you must first download the pre-trained weights.
 
 ```bash
 mkdir -p model/weights
-wget https://github.com/dmanou/Segmentation_Collagene/releases/download/v1.0.0/pretrained_weights.pth -O model/weights/pretrained_weights.pth
+wget https://github.com/dmanou/DeepCollagenSeg/releases/download/v1.0.0/pretrained_weights.pth -O model/weights/pretrained_weights.pth
 ```
 ## Run inference
 
