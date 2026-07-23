@@ -42,5 +42,11 @@ wget https://github.com/dmanou/DeepCollagenSeg/releases/download/v1.0.0/pretrain
 ## Run inference
 
 ### Tile inference
+```bash
+python tile_inference.py --tile --save_mask
+```
 
 ### Whole Slide Image
+```bash
+python wsi_inference.py --wsi --preprocess
+```
