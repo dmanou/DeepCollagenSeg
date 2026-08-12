@@ -23,18 +23,36 @@ cd DeepCollagenSeg
 
 ### Create a Conda environment (Python 3.12.13)
 ```bash
-conda create -n segcoll python=3.12.13 -y
+conda create -n segcoll python=3.9.16 -y
 conda activate segcoll
 cd segmentation
 ```
-### Install dependencies
+### Install PyTorch first
+Go to [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/),
+select your OS / package manager / CUDA version, and run the install
+command it gives you. **Do this before the next step.** For example:
+```bash
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+```
+### Install the rest (includes tiatoolbox)
 ```bash
 pip install -r requirements.txt
 ```
-### PyTorch installation
+`tiatoolbox` declares `torch>=2.5.0` among its dependencies (we only use
+`tiatoolbox.wsicore.wsireader` for reading WSIs and tiling - no models, so
+the exact torch version doesn't otherwise matter to us). Because pip's
+default behaviour is to only upgrade a dependency if what's installed
+doesn't satisfy it, your torch from step 3 is left alone here as long as
+it's `>=2.5.0`.
+
+If you install an **older** torch in step 3 (below tiatoolbox's floor),
+this step will upgrade it - restore your version afterward:
 ```bash
-pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==<your version> torchvision==<your version> --index-url <your index> --force-reinstall --no-deps
 ```
+This is safe even though `pip check` may then flag tiatoolbox's
+declared requirement as unmet: we never exercise tiatoolbox's
+torch-dependent code, only its WSI reader.
 ### Download the pretrained weights
 ```bash
 mkdir -p model/weights
@@ -48,8 +66,8 @@ CSV listing tile paths:
 python tile_inference.py --tile path/to/tile_or_folder_or_csv --save_mask
 ```
 Writes `results/tile_inference/tile_inference_report.csv` (one row per
-tile, with its predicted collagen ratio) and, with `--save_mask`, a PNG
-mask per tile under `results/tile_inference/masks/`.
+tile, with `collagen_area_px2` and, if `--mpp` is given, `collagen_area_mm2`)
+and, with `--save_mask`, a PNG mask per tile under `results/tile_inference/masks/`.
 
 **Whole-slide image** — tile a WSI (tissue detection + patch extraction)
 and run inference on it in one command:
@@ -76,19 +94,17 @@ StarDist model — no training required, weights are downloaded
 automatically on first use.
 
 ### Install
-
-Follow intasllation instruction from the [official stardist github](https://github.com/stardist/stardist).
-
 ```bash
 cd stardist
+pip install -r requirements.txt
 ```
 ### Run
 ```bash
 python stardist_inference.py --tile path/to/tile_or_folder_or_csv --save_labels
 ```
-Writes `results/stardist/stardist_report.csv` (one row per tile, with its
-predicted cell count) and, with `--save_labels`, an instance label map
-(`.npy`) per tile under `results/stardist/labels/`.
+Writes `results/stardist_report.csv` (one row per tile, with its predicted
+cell count). Instance label maps are **not** saved by default; pass
+`--save_labels` to also write a `.npy` per tile under `results/labels/`.
 
 This pipeline is fully independent from `segmentation/` — it doesn't need
 PyTorch or the collagen model's weights, only the `stardist` package
