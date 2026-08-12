@@ -11,7 +11,7 @@ used separately:
   pretrained [StarDist](https://github.com/stardist/stardist) model (not
   part of this paper; included here as a convenient companion tool).
 
-## 1) Clone the repository
+## Clone the repository
 ```bash
 git clone https://github.com/dmanou/DeepCollagenSeg.git
 cd DeepCollagenSeg
@@ -21,21 +21,21 @@ cd DeepCollagenSeg
 
 ## Collagen segmentation (`segmentation/`)
 
-### 2) Create a Conda environment (Python 3.9.16)
+### Create a Conda environment (Python 3.9.16)
 ```bash
 conda create -n segcoll python=3.9.16 -y
 conda activate segcoll
 cd segmentation
 ```
-### 3) Install dependencies
+### Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
-### 4) PyTorch installation
+### PyTorch installation
 ```bash
 pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 ```
-### 5) Download the pretrained weights
+### Download the pretrained weights
 ```bash
 mkdir -p model/weights
 wget https://github.com/dmanou/DeepCollagenSeg/releases/download/v1.0.0/pretrained_weights.pth -O model/weights/pretrained_weights.pth
@@ -76,9 +76,11 @@ StarDist model — no training required, weights are downloaded
 automatically on first use.
 
 ### Install
+
+Follow intasllation instruction from the [official stardist github](https://github.com/stardist/stardist).
+
 ```bash
 cd stardist
-pip install -r requirements.txt
 ```
 ### Run
 ```bash
