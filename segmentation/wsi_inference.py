@@ -54,6 +54,11 @@ def parse_args():
         "--save_mask", action="store_true",
         help="Save each tile's predicted binary mask as a PNG.",
     )
+    parser.add_argument(
+        "--island_chunk_size", type=int, default=5000,
+        help="Flush accumulated per-island features to disk every N rows, to "
+             "bound memory usage on large slides.",
+    )
     return parser.parse_args()
 
 
@@ -90,7 +95,13 @@ def main():
 
     mpp = get_slide_mpp(args.wsi)
     if mpp is None:
-        print("Warning: mpp unavailable for this slide - only collagen_area_px2 will be reported.")
+        print("Warning: mpp unavailable for this slide - only pixel-based values will be reported.")
+
+    report_path = output_dir / "wsi_inference_report.csv"
+    islands_path = output_dir / "wsi_inference_islands.csv"
+    for path in (report_path, islands_path):
+        if path.exists():
+            path.unlink()
 
     dataset = TileDataset(manifest, target_size=args.target_size)
     loader = DataLoader(
@@ -105,7 +116,9 @@ def main():
         UNet(in_channels=3, out_channels=64, num_classes=1), args.weights, device
     )
 
-    records = []
+    report_records = []
+    island_chunks = []
+
     with torch.no_grad():
         for images, paths, orig_h, orig_w in tqdm(loader, desc="Running inference"):
             images = images.to(device, non_blocking=True)
@@ -113,7 +126,9 @@ def main():
             masks = utils.predict_mask(logits, threshold=args.threshold)
 
             for path, mask, h, w in zip(paths, masks, orig_h.tolist(), orig_w.tolist()):
-                n_pixels, area_mm2 = utils.compute_mask_area(mask, h, w, args.target_size, mpp)
+                mpp_eff = utils.effective_mpp(h, w, args.target_size, mpp)
+                n_pixels, area_mm2 = utils.compute_mask_area(mask, mpp_eff)
+
                 record = {"tile_path": path, "collagen_area_px2": n_pixels}
                 if area_mm2 is not None:
                     record["collagen_area_mm2"] = area_mm2
@@ -123,16 +138,26 @@ def main():
                     utils.save_mask_png(mask, mask_path)
                     record["mask_path"] = str(mask_path)
 
-                records.append(record)
+                report_records.append(record)
 
-    report = pd.DataFrame(records)
-    report_path = output_dir / "wsi_inference_report.csv"
+                islands = utils.extract_collagen_features(mask, mpp_eff, path)
+                if not islands.empty:
+                    island_chunks.append(islands)
+
+            if sum(len(c) for c in island_chunks) >= args.island_chunk_size:
+                utils.append_chunk_csv(island_chunks, islands_path)
+
+    utils.append_chunk_csv(island_chunks, islands_path)
+
+    report = pd.DataFrame(report_records)
     report.to_csv(report_path, index=False)
 
     print(f"Slide-level total collagen area: {report['collagen_area_px2'].sum()} px2 (at model resolution)")
     if "collagen_area_mm2" in report.columns:
         print(f"Slide-level total collagen area: {report['collagen_area_mm2'].sum():.4f} mm2")
-    print(f"Saved report ({len(report)} tiles) to {report_path}")
+    print(f"Saved tile-level report ({len(report)} tiles) to {report_path}")
+    if islands_path.exists():
+        print(f"Saved per-island features to {islands_path}")
 
 
 if __name__ == "__main__":
