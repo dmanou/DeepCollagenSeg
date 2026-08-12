@@ -63,10 +63,7 @@ def get_thumbnail(reader: WSIReader, power: float = DEFAULT_THUMBNAIL_POWER):
 
 
 def detect_tissue(thumbnail: np.ndarray) -> np.ndarray:
-    """Otsu threshold on a red/blue-vs-green heatmap; isolates H&E stained tissue.
-    https://doi.org/10.1038/s41598-023-50183-4
-    Schreiber algorithm
-    """
+    """Otsu threshold on a red/blue-vs-green heatmap; isolates H&E stained tissue."""
     red = thumbnail[:, :, 0].astype(np.float32)
     green = thumbnail[:, :, 1].astype(np.float32)
     blue = thumbnail[:, :, 2].astype(np.float32)
@@ -117,6 +114,17 @@ def get_base_mpp(reader: WSIReader) -> tuple[float, float] | None:
     if mpp.size == 1:
         return float(mpp[0]), float(mpp[0])
     return float(mpp[0]), float(mpp[1])
+
+
+def get_slide_mpp(wsi_path: str) -> tuple[float, float] | None:
+    """(mpp_x, mpp_y) at full resolution (level 0) for a WSI file.
+
+    Cheap: only opens the reader for its metadata, no image data is read.
+    Used by `wsi_inference.py` to convert predicted tile masks (which are
+    resized down to `target_size` for the model) back into a physical area.
+    """
+    reader = WSIReader.open(wsi_path)
+    return get_base_mpp(reader)
 
 
 def compute_tissue_area(

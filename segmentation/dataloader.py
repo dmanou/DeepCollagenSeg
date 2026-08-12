@@ -16,10 +16,12 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
 
 class TileDataset(Dataset):
     """Loads plain RGB tiles (jpg/png/tif) for inference.
+
     Accepts either a list of file paths or a pandas DataFrame with a
     `tile_path` column (as produced by `preprocessing.py`). Returns each
-    image alongside its source path so predictions can be traced back to
-    a file.
+    image alongside its source path and its *original* (pre-resize) height
+    and width, so downstream code can convert the predicted mask back to a
+    physical area even though inference always runs at `target_size`.
     """
 
     def __init__(self, tile_paths, target_size=512):
@@ -46,10 +48,11 @@ class TileDataset(Dataset):
         path = self.tile_paths[idx]
 
         image = np.array(Image.open(path).convert("RGB"))
+        orig_h, orig_w = image.shape[:2]
         image = self._resize(image)
         image = self.to_image(image).float() / 255.0
 
-        return image, str(path)
+        return image, str(path), orig_h, orig_w
 
 
 def list_tile_paths(tile_arg: str) -> list[str]:
