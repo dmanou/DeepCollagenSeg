@@ -21,9 +21,9 @@ cd DeepCollagenSeg
 
 ## Collagen segmentation (`segmentation/`)
 
-### Create a Conda environment (Python 3.9.16)
+### Create a Conda environment (Python 3.12.13)
 ```bash
-conda create -n segcoll python=3.9.16 -y
+conda create -n segcoll python=3.12.13 -y
 conda activate segcoll
 cd segmentation
 ```
