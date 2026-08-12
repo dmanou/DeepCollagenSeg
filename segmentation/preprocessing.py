@@ -63,7 +63,10 @@ def get_thumbnail(reader: WSIReader, power: float = DEFAULT_THUMBNAIL_POWER):
 
 
 def detect_tissue(thumbnail: np.ndarray) -> np.ndarray:
-    """Otsu threshold on a red/blue-vs-green heatmap; isolates H&E stained tissue."""
+    """Otsu threshold on a red/blue-vs-green heatmap; isolates H&E stained tissue.
+    https://doi.org/10.1038/s41598-023-50183-4
+    Schreiber algorithm
+    """
     red = thumbnail[:, :, 0].astype(np.float32)
     green = thumbnail[:, :, 1].astype(np.float32)
     blue = thumbnail[:, :, 2].astype(np.float32)
