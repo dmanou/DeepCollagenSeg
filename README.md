@@ -1,6 +1,6 @@
 # DeepCollagenSeg
 ## Overview
-Pytorch implementation of the paper "XX"
+Pytorch implementation of the paper **"Linking MRI signal, histopathology and intraoperative consistency in intracranial meningioma: a quantitative whole-slide study"**
 ![Collagen segmentation](segmentation.png)
 
 This repository has two independent pipelines that can be installed and
